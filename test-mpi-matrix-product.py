@@ -1,20 +1,27 @@
-import pyopencl as cl # pip install pyopencl e pip install pyopencl[pocl] 
+import pyopencl as cl
 import numpy as np
-
+import time
 import os
-os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
-os.environ['PYOPENCL_CTX'] = '0'
 
-(n, m, p) = (300, 400, 500)
+def current_milli_time():
+    return round(time.time() * 1000)
+
+os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
+#os.environ['PYOPENCL_CTX'] = '0'
+
+(n, m, p) = (1000, 1000, 5000)
 
 # a = np.random.randn(n, m).astype(np.float32)
 # b = np.random.randn(m, p).astype(np.float32)
+print("Inizializzo A",n,"x",m)
 a = np.random.randint(2, size=(n*m))
+print("Inizializzo B",m,"x",p)
 b = np.random.randint(2, size=(m*p))
-c = np.zeros((n*p), dtype=np.float32)
+print("Inizializzo C",n,"x",p)
+c = np.zeros((n*p), dtype=np.float64)
 
-a = a.astype(np.float32)
-b = b.astype(np.float32)
+a = a.astype(np.float64)
+b = b.astype(np.float64)
 
 #ctx = cl.create_some_context()
 platforms = cl.get_platforms()
@@ -51,14 +58,13 @@ prg = cl.Program(ctx, """
       }
     }
     """).build()
-
 prg.multiply(queue, c.shape, None,
              np.uint16(n), np.uint16(m), np.uint16(p),
              a_buf, b_buf, c_buf)
-
 a_mul_b = np.empty_like(c)
+t0 = current_milli_time()
 cl.enqueue_copy(queue, a_mul_b, c_buf)
-
+print("t:",str(current_milli_time()-t0),"ms")
 print ("matrix A:")
 print (a.reshape(n, m))
 print ("matrix B:")
