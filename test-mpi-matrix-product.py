@@ -9,7 +9,7 @@ def current_milli_time():
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 #os.environ['PYOPENCL_CTX'] = '0'
 
-(n, m, p) = (1000, 1000, 3000)
+(n, m, p) = (1100, 1100, 3000)
 
 # a = np.random.randn(n, m).astype(np.float32)
 # b = np.random.randn(m, p).astype(np.float32)
