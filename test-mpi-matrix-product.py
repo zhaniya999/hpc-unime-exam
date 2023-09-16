@@ -14,7 +14,7 @@ os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 
 (n, m, p) = (1100, 1100, 3000)
 out = {"e":"","t":0,"platform":"","size":0,"rank":0}
-debug = False
+debug = True
 
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
@@ -25,13 +25,13 @@ out["rank"]=rank
 # a = np.random.randn(n, m).astype(np.float32)
 # b = np.random.randn(m, p).astype(np.float32)
 if debug:
-    print("Init A: ",n,"x",m)
+    print(rank,"/",size," Init A: ",n,"x",m)
 a = np.random.randint(2, size=(n*m))
 if debug:
-    print("Init B: ",m,"x",p)
+    print(rank,"/",size," Init B: ",m,"x",p)
 b = np.random.randint(2, size=(m*p))
 if debug:
-    print("Init C: ",n,"x",p)
+    print(rank,"/",size," Init C: ",n,"x",p)
 c = np.zeros((n*p), dtype=np.float64)
 
 a = a.astype(np.float64)
@@ -44,11 +44,11 @@ dev = platforms[0].get_devices(device_type=cl.device_type.GPU)
 if(len(dev)==0):
     dev = platforms[0].get_devices(device_type=cl.device_type.CPU)
     if debug:
-        print("GPU not present, Working with CPU")
+        print(rank,"/",size," GPU not present, Working with CPU")
     out["e"]="C"
 else:
     if debug:
-        print("Working with GPU")
+        print(rank,"/",size," Working with GPU")
     out["e"]="G"
 ctx = cl.Context(devices=dev)
 queue = cl.CommandQueue(ctx)
@@ -85,10 +85,10 @@ cl.enqueue_copy(queue, a_mul_b, c_buf)
 out["t"]=current_milli_time()-t0
 if debug:
     print("t:",str(out["t"]),"ms")
-    print ("matrix A:")
+    print (rank,"/",size," matrix A:")
     print (a.reshape(n, m))
-    print ("matrix B:")
+    print (rank,"/",size," matrix B:")
     print (b.reshape(m, p))
-    print ("multiplied A*B:")
+    print (rank,"/",size," multiplied A*B:")
     print (a_mul_b.reshape(n, p))
 print(out)

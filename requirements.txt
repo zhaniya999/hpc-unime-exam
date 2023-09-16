@@ -1,0 +1,22 @@
+name: drl
+channels:
+  - pytorch
+  - anaconda
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
+  - numpy>=1.16.4
+  - pandas>=1.0.3
+  - scikit-learn>=0.21.0
+  - gym>=0.15.3
+  - tensorflow-gpu=1.14.0
+  - joblib>=0.15.1
+  - matplotlib>=3.2.1
+  - pytest>=5.3.2,<6.0.0
+  - setuptools>=41.4.0,<42.0.0
+  - wheel>=0.33.6,<0.34.0
+  - mpi4py
+  - pip:
+    - stockstats
+    - stable-baselines[mpi]
