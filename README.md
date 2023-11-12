@@ -2,6 +2,7 @@
 
 * pip install pyopencl
 * pip install pyopencl[pocl]
+* pip install pandas
 * https://www.hackerearth.com/practice/notes/raspberry-pi-hacks-part-1-building-mpi-for-python-on-a-raspberry-pi-cluster/
 * https://nyu-cds.github.io/python-mpi/setup/
 
@@ -11,3 +12,8 @@ WINDOWS
 * clear pip cache with python -m pip cache remove *
 * from https://learn.microsoft.com/it-it/message-passing-interface/microsoft-mpi#ms-mpi-downloads download latest version of Microsoft MPI and install it
 * install mpi4py with python.exe -m pip install mpi4py
+
+Test opencl with:
+
+WINDOWS
+* mpiexec.exe -n 1 python.exe .\test-mpi-matrix-product.py

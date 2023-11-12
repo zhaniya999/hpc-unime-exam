@@ -4,7 +4,6 @@ from mpi4py import MPI
 
 rank = MPI.COMM_WORLD.Get_rank()
 
-
 def log(msg, *args):
     if rank == 0:
         print (msg % args)
@@ -20,7 +19,7 @@ service = 'pyeval'
 MPI.Publish_name(service, info, port)
 log("published service: '%s'", service)
 
-MPI.COMM_WORLD.Spawn("./client.py", maxprocs=1)
+#MPI.COMM_WORLD.Spawn("./client.py", maxprocs=1)
 
 root = 0
 log('waiting for client connection...')

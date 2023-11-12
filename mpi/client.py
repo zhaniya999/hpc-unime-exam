@@ -3,7 +3,6 @@ from mpi4py import MPI
 
 rank = MPI.COMM_WORLD.Get_rank()
 
-
 def log(msg, *args):
     if rank == 0:
         print (msg % args)
@@ -23,7 +22,7 @@ while True:
     done = False
     if rank == root:
         try:
-            message = input('pyeval>>> ')
+            message = raw_input('pyeval>>> ')
             if message == 'quit':
                 message = None
                 done = True

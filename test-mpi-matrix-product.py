@@ -3,7 +3,9 @@ import numpy as np
 import time
 import os
 import mpi4py
+import argparse
 from mpi4py import MPI
+import pandas as pd
 
 
 def current_milli_time():
@@ -44,7 +46,7 @@ dev = platforms[0].get_devices(device_type=cl.device_type.GPU)
 if(len(dev)==0):
     dev = platforms[0].get_devices(device_type=cl.device_type.CPU)
     if debug:
-        print(rank,"/",size," GPU not present, Working with CPU")
+        print(rank,"/",size," the GPU is absent, the CPU is used")
     out["e"]="C"
 else:
     if debug:
