@@ -6,7 +6,10 @@
 * https://www.hackerearth.com/practice/notes/raspberry-pi-hacks-part-1-building-mpi-for-python-on-a-raspberry-pi-cluster/
 * https://nyu-cds.github.io/python-mpi/setup/
 
+In some environment like LINUX could be necessary to substitute the pip command with pip3
+
 WINDOWS
+
 * remove, if present, any OpenMPI, Microsoft MPI
 * run python.exe -m pip uninstall mpi4py
 * clear pip cache with python -m pip cache remove *
@@ -16,4 +19,9 @@ WINDOWS
 Test opencl with:
 
 WINDOWS
+
 * mpiexec.exe -n 1 python.exe .\test-mpi-matrix-product.py
+
+LINUX
+
+* mpiexec -n 1 python3 ./test-mpi-matrix-product.py

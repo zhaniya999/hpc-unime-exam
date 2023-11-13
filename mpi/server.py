@@ -8,7 +8,7 @@ def log(msg, *args):
     if rank == 0:
         print (msg % args)
 
-log('')
+log('Start')
 
 info = MPI.INFO_NULL
 
