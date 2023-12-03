@@ -22,7 +22,7 @@ while True:
     done = False
     if rank == root:
         try:
-            message = raw_input('pyeval>>> ')
+            message = input('pyeval>>> ')
             if message == 'quit':
                 message = None
                 done = True

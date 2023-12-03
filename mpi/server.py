@@ -35,7 +35,7 @@ while True:
         else:
             try:
                 print ('eval(%r) -> %r' % (message, eval(message)))
-            except StandardError:
+            except Exception:
                 print ("invalid expression: %s" % message)
     done = MPI.COMM_WORLD.bcast(done, root)
     if done:
