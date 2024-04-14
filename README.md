@@ -1,8 +1,16 @@
 # hpc-unime-exam
 
+Configure a venv with:
+* python -m venv /hpc-mpi
+Activate with:
+* /hpc-mpi/Scripts/Activate.ps1 (Windows with powershell)
+* /hpc-mpi/Scripts/activate.bat (Windows with cmd)
+* /hpc-mpi/bin/activate (Linux)
+
 * pip install pyopencl
 * pip install pyopencl[pocl]
 * pip install pandas
+* pip install mpi4py (must be installed python3-devel, libopenmpi-devel to be compiled)
 * https://www.hackerearth.com/practice/notes/raspberry-pi-hacks-part-1-building-mpi-for-python-on-a-raspberry-pi-cluster/
 * https://nyu-cds.github.io/python-mpi/setup/
 
