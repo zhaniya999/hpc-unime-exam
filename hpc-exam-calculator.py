@@ -2,44 +2,54 @@ import pyopencl as cl
 import numpy as np
 import time
 import os
-import mpi4py
-import argparse
 from mpi4py import MPI
-import pandas as pd
+import util as ut
 
 
-def current_milli_time():
-    return round(time.time() * 1000)
+
+info = MPI.INFO_NULL
+
+
+service = "hpc"
+ut.log("looking-up service '%s'", service)
+port = MPI.Lookup_name(service)
+ut.log("service located  at port '%s'", port)
+
+root = 0
+ut.log('waiting for data ')
+comm = MPI.COMM_WORLD.Connect(port, info, root)
+message = comm.recv(source=0, tag=0)
+ut.log("received %s", message)
+
+
+
 
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
-#os.environ['PYOPENCL_CTX'] = '0'
 
-(n, m, p) = (1, 3, 5)
-out = {"e":"","t":0,"platform":"","size":0,"rank":0}
+out = {"e":"","t":0,"platform":"","name":None,"out":None}
 debug = True
 
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
-out["size"]=size
-out["rank"]=rank
+out["name"]="task0"
 
-# a = np.random.randn(n, m).astype(np.float32)
-# b = np.random.randn(m, p).astype(np.float32)
-if debug:
-    print(rank,"/",size," Init A: ",n,"x",m)
-a = np.random.randint(2, size=(n*m))
-if debug:
-    print(rank,"/",size," Init B: ",m,"x",p)
-b = np.random.randint(2, size=(m*p))
-if debug:
-    print(rank,"/",size," Init C: ",n,"x",p)
-c = np.zeros((n*p), dtype=np.float64)
+a = ut.readMatrix("a0.json")
+b = ut.readMatrix("b0.json")
+
+#the first matrix is always a row vector of size 1xn
+#the second matrix have n rows, so the columns are calulate dividing the readed array lenght by the rows
+#the results is a row vector with the same number of columns of b matrix
+
+n = 1
+m = int(len(a))
+p = int(len(b)/m)
+
+c = np.zeros(p, dtype=np.float64)
 
 a = a.astype(np.float64)
 b = b.astype(np.float64)
 
-#ctx = cl.create_some_context()
 platforms = cl.get_platforms()
 out["platform"]=platforms[0].name
 dev = platforms[0].get_devices(device_type=cl.device_type.GPU)
@@ -78,19 +88,18 @@ prg = cl.Program(ctx, """
       }
     }
     """).build()
-prg.multiply(queue, c.shape, None,
-             np.uint16(n), np.uint16(m), np.uint16(p),
-             a_buf, b_buf, c_buf)
+prg.multiply(queue, c.shape, None, np.uint16(n), np.uint16(m), np.uint16(p), a_buf, b_buf, c_buf)
 a_mul_b = np.empty_like(c)
 t0 = current_milli_time()
 cl.enqueue_copy(queue, a_mul_b, c_buf)
 out["t"]=current_milli_time()-t0
+out["c"]=a_mul_b
 if debug:
     print("t:",str(out["t"]),"ms")
-    print (rank,"/",size," matrix A:")
+    print (out["name"] + " matrix A:")
     print (a.reshape(n, m))
-    print (rank,"/",size," matrix B:")
+    print (out["name"] + " matrix B:")
     print (b.reshape(m, p))
-    print (rank,"/",size," multiplied A*B:")
+    print (out["name"] + " multiplied A*B:")
     print (a_mul_b.reshape(n, p))
 print(out)

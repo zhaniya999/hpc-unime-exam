@@ -42,3 +42,5 @@ Running the mpi/[client,server].py, using ompi-server:
     * mpiexec -ompi-server file:/tmp/ompi-server.txt -np 1 python mpi/server.py
     * mpiexec -ompi-server file:/tmp/ompi-server.txt -np 1 python mpi/client.py
 
+
+https://web.corral.tacc.utexas.edu/CompEdu/pdf/pcse/mpi_p_course.pdf

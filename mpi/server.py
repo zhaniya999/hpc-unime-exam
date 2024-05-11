@@ -3,6 +3,7 @@
 from mpi4py import MPI
 
 rank = MPI.COMM_WORLD.Get_rank()
+print("rank:"+str(rank))
 
 def log(msg, *args):
     if rank == 0:
@@ -23,7 +24,8 @@ log("published service: '%s'", service)
 
 root = 0
 log('waiting for client connection...')
-comm = MPI.COMM_WORLD.Accept(port, info, root)
+#comm = MPI.COMM_WORLD.Accept(port, info, root)
+comm = MPI.COMM_WORLD.Connect(port, info, root)
 log('client connected...')
 
 while True:
@@ -35,6 +37,7 @@ while True:
         else:
             try:
                 print ('eval(%r) -> %r' % (message, eval(message)))
+                comm.send(eval(message), dest=0, tag=0)
             except Exception:
                 print ("invalid expression: %s" % message)
     done = MPI.COMM_WORLD.bcast(done, root)

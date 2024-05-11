@@ -12,20 +12,12 @@ def current_milli_time():
     return round(time.time() * 1000)
 
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
-#os.environ['PYOPENCL_CTX'] = '0'
 
-(n, m, p) = (1, 3, 5)
+(n, m, p) = (1100, 1100, 3000)
 out = {"e":"","t":0,"platform":"","size":0,"rank":0}
-debug = True
 
 comm = MPI.COMM_WORLD
-size = comm.Get_size()
-rank = comm.Get_rank()
-out["size"]=size
-out["rank"]=rank
 
-# a = np.random.randn(n, m).astype(np.float32)
-# b = np.random.randn(m, p).astype(np.float32)
 if debug:
     print(rank,"/",size," Init A: ",n,"x",m)
 a = np.random.randint(2, size=(n*m))
