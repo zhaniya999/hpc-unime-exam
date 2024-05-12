@@ -5,7 +5,7 @@ Configure a venv with:
 Activate with:
 * /hpc-mpi/Scripts/Activate.ps1 (Windows with powershell)
 * /hpc-mpi/Scripts/activate.bat (Windows with cmd)
-* source /hpc-mpi/bin/activate
+* source /hpc-mpi/bin/activate (Linux)
 
 * pip install pyopencl
 * pip install pyopencl[pocl]
