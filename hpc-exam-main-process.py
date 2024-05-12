@@ -8,6 +8,8 @@ import mpi4py
 from mpi4py import MPI
 import pandas as pd
 import util as ut
+import json
+from datatypes import DataMessage, ResponseMessage
 
 print (sys.argv)
 
@@ -43,8 +45,6 @@ ut.log("published service: '%s'", service)
 
 out = {"e":"","t":0,"platform":"","size":0,"rank":0}
 
-comm = MPI.COMM_WORLD.Connect(port, info, 0)
-
 a = ut.initRandomMatrix('A',n,m,debug)
 a = a.astype(np.float64)
 if debug:
@@ -57,11 +57,19 @@ r = ut.initZeroMatrix('R',n,p,debug)
 if debug:
     print(r.reshape(n, p))
 
+ut.log("Waiting to send data")
+comm = MPI.COMM_WORLD.Accept(port, info, 0)
+
 for i in range(n):
     r = a.reshape(n, m)[i]
     pn = i % c
-    processMessage={"row":i,"a":r,"b":b}
-    print(processMessage)
+    data = DataMessage(i,a,b)
+    print(data)
+    processMessage=json.dumps(data)
     comm.send(processMessage, dest=0, tag=0)
+    print(comm)
+    if debug:
+        ut.log("Sent %s",processMessage)
+    comm = MPI.COMM_WORLD.Accept(port, info, 0)
     
 

@@ -9,7 +9,7 @@ def log(msg, *args):
         print (msg % args)
 
 info = MPI.INFO_NULL
-service = "pyeval"
+service = "hpc"
 log("looking-up service '%s'", service)
 port = MPI.Lookup_name(service)
 log("service located  at port '%s'", port)

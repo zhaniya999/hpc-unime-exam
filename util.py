@@ -3,11 +3,11 @@ import codecs
 import numpy as np
 import time
 
-def readMatrix(filename):
+def readMatrixFromFile(filename):
     obj_text = codecs.open(filename, 'r', encoding='utf-8').read()
     return np.array(json.loads(obj_text))
 
-def writeMatrix(matrix,filename):
+def writeMatrixToFile(matrix,filename):
     json.dump(matrix.tolist(), codecs.open(filename, 'w', encoding='utf-8'), separators=(',', ':'), sort_keys=True, indent=4)
 
 def current_milli_time():
