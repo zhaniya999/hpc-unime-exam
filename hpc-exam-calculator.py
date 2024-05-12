@@ -5,8 +5,19 @@ import os
 from mpi4py import MPI
 import util as ut
 import json
+import argparse
 from datatypes import DataMessage, ResponseMessage
 
+
+parser = argparse.ArgumentParser(description='hpc exam calculator - MPI Test')
+parser.add_argument('-d',help='Enable debug messages')
+args = parser.parse_args()
+debug = False
+
+if args.d is None:
+    debug = False
+else:
+    debug = True
 
 
 info = MPI.INFO_NULL
@@ -17,24 +28,19 @@ ut.log("service located  at port '%s'", port)
 root = 0
 ut.log('waiting for data ')
 comm = MPI.COMM_WORLD.Connect(port, info, root)
-message = comm.recv(source=0, tag=0)
-ut.log("received %s", message)
 
 os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
 out = ResponseMessage(result=None,type=None,time=0,row=None)
-comm = MPI.COMM_WORLD
-
-debug = True
 
 while True:
-    comm.send("", dest=0, tag=0)
-    message = comm.recv(source=0, tag=0)
+    #comm.send("", dest=0, tag=0)
+    message = comm.recv(source=0, tag=0).strip()
     ut.log("Received %s",message)
-    messageObj = json.loads(message, cls=DataMessage)
-    out.setRow(messageObj.getRow())
+    messageObj = json.loads(message)
+    out.setRow(messageObj["row"])
 
-    a = np.array(messageObj.a)
-    b = np.array(messageObj.b)
+    a = np.array(messageObj["a"])
+    b = np.array(messageObj["b"])
 
     #the first matrix is always a row vector of size 1xn
     #the second matrix have n rows, so the columns are calulate dividing the readed array lenght by the rows
@@ -89,17 +95,18 @@ while True:
         """).build()
     prg.multiply(queue, c.shape, None, np.uint16(n), np.uint16(m), np.uint16(p), a_buf, b_buf, c_buf)
     a_mul_b = np.empty_like(c)
-    t0 = current_milli_time()
+    t0 = ut.current_milli_time()
     cl.enqueue_copy(queue, a_mul_b, c_buf)
-    out.setTime(current_milli_time()-t0)
-    out.setResult(a_mul_b)
-    out.setRow()
+    out.setTime(ut.current_milli_time()-t0)
+    out.setResult(a_mul_b.tolist())
+    print(out.getResult())
+    comm.send(out.toJSON(), dest=0, tag=0)
     if debug:
-        print("t:",str(out["t"]),"ms")
-        print (out["name"] + " matrix A:")
+        print("t:",str(out.getTime()),"ms")
+        print ("matrix A:")
         print (a.reshape(n, m))
-        print (out["name"] + " matrix B:")
+        print ("matrix B:")
         print (b.reshape(m, p))
-        print (out["name"] + " multiplied A*B:")
+        print ("multiplied A*B:")
         print (a_mul_b.reshape(n, p))
-    print(out)
+    print(out.toJSON())

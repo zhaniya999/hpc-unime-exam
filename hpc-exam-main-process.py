@@ -1,17 +1,13 @@
 import argparse
 import sys
-import pyopencl as cl
 import numpy as np
 import time
 import os
-import mpi4py
 from mpi4py import MPI
-import pandas as pd
 import util as ut
 import json
 from datatypes import DataMessage, ResponseMessage
 
-print (sys.argv)
 
 parser = argparse.ArgumentParser(description='hpc exam - MPI Test')
 parser.add_argument('-c',help='number of client process')
@@ -43,7 +39,7 @@ MPI.Publish_name(service, info, port)
 ut.log("published service: '%s'", service)
 
 
-out = {"e":"","t":0,"platform":"","size":0,"rank":0}
+out = {"t":0,"results":None,"size":c}
 
 a = ut.initRandomMatrix('A',n,m,debug)
 a = a.astype(np.float64)
@@ -53,23 +49,32 @@ b = ut.initRandomMatrix('B',m,p,debug)
 b = b.astype(np.float64)
 if debug:
     print(b.reshape(m, p))
-r = ut.initZeroMatrix('R',n,p,debug)
-if debug:
-    print(r.reshape(n, p))
-
+#r = ut.initZeroMatrix('R',n,p,debug)
+#if debug:
+#    print(r.reshape(n, p))
+result = {}
+count = 0
 ut.log("Waiting to send data")
 comm = MPI.COMM_WORLD.Accept(port, info, 0)
+#commr = MPI.COMM_WORLD.Accept(port, info, 1)
 
+t0 = ut.current_milli_time()
 for i in range(n):
     r = a.reshape(n, m)[i]
     pn = i % c
-    data = DataMessage(i,a,b)
-    print(data)
-    processMessage=json.dumps(data)
+    data = DataMessage(i,r.tolist(),b.tolist())
+    processMessage=data.toJSON()
     comm.send(processMessage, dest=0, tag=0)
-    print(comm)
     if debug:
         ut.log("Sent %s",processMessage)
-    comm = MPI.COMM_WORLD.Accept(port, info, 0)
+    #comm = MPI.COMM_WORLD.Accept(port, info, 0)
+ut.log("Receiving results")
+while count < n:
+    res = json.loads(comm.recv(source=0, tag=0))
+    result[int(res["row"])]=res
+    count = count + 1
+out['t']=ut.current_milli_time()-t0
+out['results']=result
+print(out)
     
 
