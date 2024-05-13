@@ -36,6 +36,8 @@ while True:
     #comm.send("", dest=0, tag=0)
     message = comm.recv(source=0, tag=0).strip()
     ut.log("Received %s",message)
+    if message == 'stop':
+        break
     messageObj = json.loads(message)
     out.setRow(messageObj["row"])
 
