@@ -18,12 +18,16 @@ info = MPI.INFO_ENV
 service = 'hpc'
 debug = False
 
-def receive(comm,i,count,result):
-    res = json.loads(comm.recv(source=i))
-    ut.log("received %s from %s",res,str(i))
-    result[int(res["row"])]=res
-    count = count + 1
-    #print(result)
+def receive(comm,i,count,result,n):
+    while count < n:
+        res = json.loads(comm.recv(source=i))
+        ut.log("received %s from %s",res,str(i))
+        result[int(res["row"])]=res
+        lock = threading.Lock()
+        with lock:
+            count = count + 1
+            print(f"i:{i} count:{count} result:{result} n:{n}")
+        assert not lock.locked()
 
 
 
@@ -57,14 +61,16 @@ if rank == 0:
         global count
         result = {}
         count = 0
+        debug = True
 
-        for i in range(size-1):
-            thread = threading.Thread(target=receive, args=(comm,i+1,count,result,))
-            thread.start()
-            threads.append(thread)
         n = int(input("n:"))
         m = int(input("m:"))
         p = int(input("p:"))
+
+        for i in range(size-1):
+            thread = threading.Thread(target=receive, args=(comm,i+1,count,result,n,))
+            thread.start()
+            threads.append(thread)
 
         a = ut.initRandomMatrix('A',n,m,debug)
         a = a.astype(np.float64)
@@ -83,10 +89,8 @@ if rank == 0:
             processMessage=data.toJSON()
             destproc = 1 + i % (size-1) # the value 0 is used for the master procecc
             comm.send(processMessage, dest=destproc)
-            if debug:
-                ut.log("Sent to %s %s",str(destproc),processMessage)
-        while count != n:
-            pass
+            #if debug:
+                #ut.log("Sent to %s %s",str(destproc),processMessage)
         for thread in threads:
             thread.join()
         out['t']=ut.current_milli_time()-t0
@@ -101,14 +105,14 @@ if rank == 0:
 
 else: # if rank is different then 0 this is a calculator node
     port = None
-    ut.log("looking-up service '%s'", service)
+    #ut.log("looking-up service '%s'", service)
     while port is None:
         try:
             port = MPI.Lookup_name(service)
         except:
             pass
-    ut.log("service located  at port '%s'", port)
-    ut.log('waiting for data ')
+    #ut.log("service located  at port '%s'", port)
+    #ut.log('waiting for data ')
     os.environ['PYOPENCL_COMPILER_OUTPUT'] = '1'
     out = ResponseMessage(result=None,type=None,time=0,row=None)
 
