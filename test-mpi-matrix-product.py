@@ -5,7 +5,7 @@ import os
 import mpi4py
 import argparse
 from mpi4py import MPI
-import pandas as pd
+#import pandas as pd
 
 
 def current_milli_time():
