@@ -1,5 +1,34 @@
 import json
 
+class PathsMessage:
+    def __init__(self):
+        self.a=[]
+        self.b=None
+    
+    def addPathA(self,path):
+        self.a.append(path)
+    
+    def addPathB(self,path):
+        self.b =path
+
+    def getPathA(self):
+        return self.a
+    
+    def getPathB(self):
+        return self.b
+    
+    def haveData(self):
+        return len(self.a)>0
+
+    def toJSON(self):
+        return json.dumps(
+            self,
+            default=lambda o: o.__dict__)
+    
+    def load_from_json(cls, json_string):
+        return json.loads(json_string, object_hook=cls)
+
+
 class GenericMessage:
     def __init__(self, row):
         self.row = row

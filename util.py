@@ -8,7 +8,7 @@ def readMatrixFromFile(filename):
     return np.array(json.loads(obj_text))
 
 def writeMatrixToFile(matrix,filename):
-    json.dump(matrix.tolist(), codecs.open(filename, 'w', encoding='utf-8'), separators=(',', ':'), sort_keys=True, indent=4)
+    json.dump(matrix.tolist(), codecs.open(filename, 'w', encoding='utf-8'), separators=(',', ':'), sort_keys=False, indent=0)
 
 def current_milli_time():
     return round(time.time() * 1000)
