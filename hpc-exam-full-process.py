@@ -18,16 +18,19 @@ info = MPI.INFO_ENV
 service = 'hpc'
 debug = False
 
-def receive(comm,i,count,result,n):
-    while count < n:
+def receive(comm,i,result,stats,n):
+    while n > len(result):
+        print("n:"+str(n)+" len(result):"+str(len(result)))
         res = json.loads(comm.recv(source=i))
-        ut.log("received %s from %s",res,str(i))
-        result[int(res["row"])]=res
-        lock = threading.Lock()
-        with lock:
-            count = count + 1
-            print(f"i:{i} count:{count} result:{result} n:{n}")
-        assert not lock.locked()
+        stat = {"rank":i,
+                    "row":res["row"],
+                    "time":res["time"],
+                    "type":res["type"]}
+        stats[int(res["row"])]=stat
+        ut.log("received result row %s from %s",res["row"],str(i))
+        result[int(res["row"])]=res["result"]
+        #print("a-i:"+str(i)+" result:"+str(len(result)))
+        #print(f"i:{i} count:{count} result:{result} stats:{stats}")
 
 
 
@@ -58,9 +61,9 @@ if rank == 0:
     while True:
         threads = []
         global result
-        global count
+        global stats
         result = {}
-        count = 0
+        stats = {}
         debug = True
 
         n = int(input("n:"))
@@ -68,18 +71,19 @@ if rank == 0:
         p = int(input("p:"))
 
         for i in range(size-1):
-            thread = threading.Thread(target=receive, args=(comm,i+1,count,result,n,))
-            thread.start()
+            thread = threading.Thread(target=receive, args=(comm,i+1,result,stats,n,))
+            thread.name="rank-"+str(i+1)+"-receiver"
             threads.append(thread)
+            thread.start()
 
         a = ut.initRandomMatrix('A',n,m,debug)
         a = a.astype(np.float64)
-        if debug:
-            print(a.reshape(n, m))
+        #if debug:
+        #    print(a.reshape(n, m))
         b = ut.initRandomMatrix('B',m,p,debug)
         b = b.astype(np.float64)
-        if debug:
-            print(b.reshape(m, p))
+        #if debug:
+        #    print(b.reshape(m, p))
         
 
         t0 = ut.current_milli_time()
@@ -91,10 +95,12 @@ if rank == 0:
             comm.send(processMessage, dest=destproc)
             #if debug:
                 #ut.log("Sent to %s %s",str(destproc),processMessage)
+        print("b")
         for thread in threads:
             thread.join()
+        print("a")
         out['t']=ut.current_milli_time()-t0
-        out['results']=result
+        out['stats']=stats
         print(out)
         action = input("Stop (y/n)?")
         if action=="y":
@@ -182,7 +188,7 @@ else: # if rank is different then 0 this is a calculator node
         cl.enqueue_copy(queue, a_mul_b, c_buf)
         out.setTime(ut.current_milli_time()-t0)
         out.setResult(a_mul_b.tolist())
-        print(out.getResult())
+        print(out.toJSON())
         comm.send(out.toJSON(), dest=0, tag=0)
         '''
         if debug:

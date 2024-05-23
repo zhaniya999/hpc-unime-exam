@@ -34,7 +34,7 @@ class GenericMessage:
         self.row = row
     
     def setRow(self,row):
-        self.row = row
+        self.row = int(row)
     
     def getRow(self):
         return self.row
@@ -73,6 +73,7 @@ class ResponseMessage(GenericMessage):
         self.result = result
         self.time = time
         self.type = type
+        self.rank = None
     
     def setResult(self,result):
         self.result = result
@@ -82,6 +83,9 @@ class ResponseMessage(GenericMessage):
     
     def setTime(self,time):
         self.time = time
+
+    def setRank(self,rank):
+        self.rank = int(rank)
     
     def getResult(self):
         return self.result
@@ -91,3 +95,6 @@ class ResponseMessage(GenericMessage):
     
     def getTime(self):
         return self.time
+    
+    def getRank(self):
+        return self.rank

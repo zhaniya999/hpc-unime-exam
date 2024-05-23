@@ -1,4 +1,3 @@
-import argparse
 import sys
 import numpy as np
 import time
@@ -6,7 +5,7 @@ import os
 from mpi4py import MPI
 import util as ut
 import json
-from datatypes import DataMessage, ResponseMessage, PathsMessage
+from datatypes import ResponseMessage
 import threading
 import pyopencl as cl
 
@@ -19,11 +18,11 @@ service = 'hpc'
 debug = False
 path = '/nfs/'
 
-def receive(comm,i,stats,n):
+def receive(comm,i,stats,results):
     while size-1 > len(stats):
-        print(len(stats))
-        data = comm.recv(source=i)
+        data = json.loads(comm.recv(source=i))
         stats.append(data)
+        results[data['row']] = data["result"]
         #print("n:"+str(n)+" len(stats):"+str(len(stats)))
         #res = json.loads(comm.recv(source=i))
         #stat = {"rank":i,            "row":res["row"],                    "time":res["time"],"type":res["type"]}
@@ -34,20 +33,6 @@ def receive(comm,i,stats,n):
         #print(f"i:{i} count:{count} result:{result} stats:{stats}")
 
 
-
-'''
-parser = argparse.ArgumentParser(description='hpc exam - MPI Test')
-parser.add_argument('-d',help='Enable debug messages')
-if rank==0:
-    args = parser.parse_args(args=None if sys.argv[1:] else ['--help'])
-else:
-    args = parser.parse_args()
-
-if args.d is None:
-    debug = False
-else:
-    debug = True
-'''
 if rank == 0:
 
     ut.log("Starting main process")
@@ -56,61 +41,60 @@ if rank == 0:
     MPI.Publish_name(service, info, port)
     ut.log("published service: '%s'", service)
 
-    out = {"t":0,"results":None}
+    out = {"t":0,"results":None,"stats":None}
+    
+    threads = []
+    global result
+    global stats
+    
+    n = int(input("n:"))
+    m = int(input("m:"))
+    p = int(input("p:"))
+
+    result = [None]*n
+    stats = []
+    debug = True
+
+    for i in range(size-1):
+        thread = threading.Thread(target=receive, args=(comm,i+1,stats,result,))
+        thread.name="rank-"+str(i+1)+"-receiver"
+        threads.append(thread)
+        thread.start()
+
+    a = ut.initRandomMatrix('A',n,m,debug)
+    a = a.astype(np.float64)
+    b = ut.initRandomMatrix('B',m,p,debug)
+    b = b.astype(np.float64)
     
 
-    while True:
-        threads = []
-        global result
-        global stats
-        result = {}
-        stats = []
-        debug = True
-
-        n = int(input("n:"))
-        m = int(input("m:"))
-        p = int(input("p:"))
-
-        for i in range(size-1):
-            thread = threading.Thread(target=receive, args=(comm,i+1,stats,n,))
-            thread.name="rank-"+str(i+1)+"-receiver"
-            threads.append(thread)
-            thread.start()
-
-        a = ut.initRandomMatrix('A',n,m,debug)
-        a = a.astype(np.float64)
-        b = ut.initRandomMatrix('B',m,p,debug)
-        b = b.astype(np.float64)
-        
-
-        t0 = ut.current_milli_time()
-        filenameb = path+str(t0)+'-b.json'
-        
-        ut.writeMatrixToFile(b,filenameb)
-        messages={}
-        for i in range(size):
-            messages[i]={
-                "a":[],
-                "b":None
-            }
+    t0 = ut.current_milli_time()
+    filenameb = path+str(t0)+'-b.json'
+    
+    ut.writeMatrixToFile(b,filenameb)
+    messages={}
+    for i in range(size):
+        messages[i]={
+            "a":[],
+            "b":None
+        }
 
 
-        for i in range(n):
-            destproc = 1 + i % (size-1) # the value 0 is used for the master procecc
-            filename = path+str(t0)+'-a-'+str(destproc)+'-'+str(i)+'.json'
-            r = a.reshape(n, m)[i]
-            ut.writeMatrixToFile(r,filename)
-            messages[destproc]["a"].append(filename)
-            messages[destproc]["b"] = filenameb
-        
-        t0 = ut.current_milli_time()
-        #comm.scatter(messages,0)
-        comm.bcast(json.dumps(messages),0)
-        for thread in threads:
-            thread.join()
-        out['t']=ut.current_milli_time()-t0
-        out['stats']=stats
-        print(out)
+    for i in range(n):
+        destproc = 1 + i % (size-1) # the value 0 is used for the master procecc
+        filename = path+str(t0)+'-a-'+str(destproc)+'-'+str(i)+'.json'
+        r = a.reshape(n, m)[i]
+        ut.writeMatrixToFile(r,filename)
+        messages[destproc]["a"].append(filename)
+        messages[destproc]["b"] = filenameb
+    
+    t0 = ut.current_milli_time()
+    comm.bcast(json.dumps(messages),0)
+    for thread in threads:
+        thread.join()
+    out['t']=ut.current_milli_time()-t0
+    c = ut.mergeResults()
+    out['stats']=stats
+    print(out)
 
 else: # if rank is different then 0 this is a calculator node
     port = None
@@ -127,6 +111,7 @@ else: # if rank is different then 0 this is a calculator node
     message = json.loads(comm.bcast(None,0))
     b = ut.readMatrixFromFile(message[str(rank)]['b'])
     for patha in message[str(rank)]['a']:
+        print(f"rank:{rank} path:{patha}")
         a = ut.readMatrixFromFile(patha)
 
         pathtok=patha.split("-")
@@ -134,6 +119,7 @@ else: # if rank is different then 0 this is a calculator node
         filename = pathtok[0]+"-c-"+str(rank)+"-"+pathtok[len(pathtok)-1]
         out.setRow(row)
         out.setResult(filename)
+        out.setRank(rank)
     
 
         #the first matrix is always a row vector of size 1xn
@@ -151,7 +137,7 @@ else: # if rank is different then 0 this is a calculator node
 
         a = a.astype(np.float64)
         b = b.astype(np.float64)
-
+        
         platforms = cl.get_platforms()
         dev = platforms[0].get_devices(device_type=cl.device_type.GPU)
         if(len(dev)==0):
@@ -189,14 +175,17 @@ else: # if rank is different then 0 this is a calculator node
             }
             }
             """).build()
-        prg.multiply(queue, c.shape, None, np.uint16(n), np.uint16(m), np.uint16(p), a_buf, b_buf, c_buf)
-        a_mul_b = np.empty_like(c)
         t0 = ut.current_milli_time()
-        cl.enqueue_copy(queue, a_mul_b, c_buf)
+        prg.multiply(queue, c.shape, None, np.uint16(n), np.uint16(m), np.uint16(p), a_buf, b_buf, c_buf)
         out.setTime(ut.current_milli_time()-t0)
+        a_mul_b = np.empty_like(c)
+        cl.enqueue_copy(queue, a_mul_b, c_buf)
+        ut.writeMatrixToFile(c,filename)
 
         #print(out.toJSON())
         comm.send(out.toJSON(), dest=0)
+        print(c)
+        print(a_mul_b)
         '''
         if debug:
             print("t:",str(out.getTime()),"ms")
