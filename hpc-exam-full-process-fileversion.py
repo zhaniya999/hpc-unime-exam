@@ -8,6 +8,8 @@ import json
 from datatypes import ResponseMessage
 import threading
 import pyopencl as cl
+import pyopencl.array as cl_array
+from pyopencl.tools import SVMAllocator, SVMPool
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -44,19 +46,19 @@ if rank == 0:
     out = {"t":0,"results":None,"stats":None}
     
     threads = []
-    global result
+    global results
     global stats
     
     n = int(input("n:"))
     m = int(input("m:"))
     p = int(input("p:"))
 
-    result = [None]*n
+    results = [""]*n
     stats = []
     debug = True
 
     for i in range(size-1):
-        thread = threading.Thread(target=receive, args=(comm,i+1,stats,result,))
+        thread = threading.Thread(target=receive, args=(comm,i+1,stats,results,))
         thread.name="rank-"+str(i+1)+"-receiver"
         threads.append(thread)
         thread.start()
@@ -92,7 +94,7 @@ if rank == 0:
     for thread in threads:
         thread.join()
     out['t']=ut.current_milli_time()-t0
-    c = ut.mergeResults()
+    #c = ut.mergeResults(n,m,p,results)
     out['stats']=stats
     print(out)
 
@@ -111,7 +113,7 @@ else: # if rank is different then 0 this is a calculator node
     message = json.loads(comm.bcast(None,0))
     b = ut.readMatrixFromFile(message[str(rank)]['b'])
     for patha in message[str(rank)]['a']:
-        print(f"rank:{rank} path:{patha}")
+        #print(f"rank:{rank} path:{patha}")
         a = ut.readMatrixFromFile(patha)
 
         pathtok=patha.split("-")
@@ -130,13 +132,13 @@ else: # if rank is different then 0 this is a calculator node
         m = int(len(a))
         p = int(len(b)/m)
 
-        #print (a.reshape(n, m))
-        #print (b.reshape(m, p))
-
         c = np.zeros(p, dtype=np.float64)
 
         a = a.astype(np.float64)
         b = b.astype(np.float64)
+
+        print(a)
+        print(b)
         
         platforms = cl.get_platforms()
         dev = platforms[0].get_devices(device_type=cl.device_type.GPU)
@@ -152,49 +154,35 @@ else: # if rank is different then 0 this is a calculator node
         ctx = cl.Context(devices=dev)
         queue = cl.CommandQueue(ctx)
 
-        mf = cl.mem_flags
-        a_buf = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=a)
-        b_buf = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=b)
-        c_buf = cl.Buffer(ctx, mf.WRITE_ONLY, c.nbytes)
+        matrix_buf = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=b)
+        vector_buf = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=a)
+        result_buf = cl.Buffer(ctx, cl.mem_flags.WRITE_ONLY, c.nbytes)
 
         prg = cl.Program(ctx, """
-            __kernel void multiply(ushort n,
-            ushort m, ushort p, __global float *a,
-            __global float *b, __global float *c)
-            {
-            int gid = get_global_id(0);
-            c[gid] = 0.0f;
-            int rowC = gid/p;
-            int colC = gid%p;
-            __global float *pA = &a[rowC*m];
-            __global float *pB = &b[colC];
-            for(int k=0; k<m; k++)
-            {
-                pB = &b[colC+k*p];
-                c[gid] += (*(pA++))*(*pB);
-            }
-            }
+            __kernel void multiply(__global float* matrix,
+                __global float* vector,
+                __global float* result,
+                const int rows,
+                const int cols) {
+                        int row = get_global_id(0);
+                        if (row < rows) {
+                            float sum = 0.0f;
+                            for (int col = 0; col < cols; col++) {
+                                printf("m[%d]=%f v[%d]=%f m*v=%f - ",row * cols + col,matrix[row * cols + col],col,vector[col],matrix[row * cols + col] * vector[col]);
+                                sum += matrix[row * cols + col] * vector[col];
+                            }
+                        result[row] = sum;
+                        printf("#");
+                    }
+                }
             """).build()
+        kernel = prg.multiply
+        kernel.set_args(matrix_buf, vector_buf, result_buf, np.int32(m), np.int32(p))
         t0 = ut.current_milli_time()
-        prg.multiply(queue, c.shape, None, np.uint16(n), np.uint16(m), np.uint16(p), a_buf, b_buf, c_buf)
+        cl.enqueue_nd_range_kernel(queue, kernel, (m,), None)
+        cl.enqueue_copy(queue, c, result_buf)
+        queue.finish()
         out.setTime(ut.current_milli_time()-t0)
-        a_mul_b = np.empty_like(c)
-        cl.enqueue_copy(queue, a_mul_b, c_buf)
         ut.writeMatrixToFile(c,filename)
 
-        #print(out.toJSON())
         comm.send(out.toJSON(), dest=0)
-        print(c)
-        print(a_mul_b)
-        '''
-        if debug:
-            print("t:",str(out.getTime()),"ms")
-            print ("matrix A:")
-            print (a.reshape(n, m))
-            print ("matrix B:")
-            print (b.reshape(m, p))
-            print ("multiplied A*B:")
-            print (a_mul_b.reshape(n, p))
-        print(out.toJSON())
-        '''
-
