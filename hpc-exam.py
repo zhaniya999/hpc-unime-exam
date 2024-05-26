@@ -1,6 +1,4 @@
-import sys
 import numpy as np
-import time
 import os
 from mpi4py import MPI
 import util as ut
@@ -8,8 +6,6 @@ import json
 from datatypes import ResponseMessage
 import threading
 import pyopencl as cl
-import pyopencl.array as cl_array
-from pyopencl.tools import SVMAllocator, SVMPool
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -20,21 +16,19 @@ service = 'hpc'
 debug = False
 path = '/nfs/'
 
-def receive(comm,i,stats,results):
-    while size-1 > len(stats):
+def receive(comm,i,stats,results,cols,resultsrows):
+    print("b l:"+str(len(stats))+" r:"+str(resultsrows))
+    #while len(stats) < resultsrows:
+    while True:
         data = json.loads(comm.recv(source=i))
         stats.append(data)
-        #print(data["result"])
-        
-        #results[data['row']] = data["result"]
-        #print("n:"+str(n)+" len(stats):"+str(len(stats)))
-        #res = json.loads(comm.recv(source=i))
-        #stat = {"rank":i,            "row":res["row"],                    "time":res["time"],"type":res["type"]}
-        #stats[int(res["row"])]=stat
-        #ut.log("received result row %s from %s",res["row"],str(i))
-        #result[int(res["row"])]=res["result"]
-        #print("a-i:"+str(i)+" result:"+str(len(result)))
-        #print(f"i:{i} count:{count} result:{result} stats:{stats}")
+        rowdata = ut.readMatrixFromFile(data["result"])
+        row = int(data["row"])
+        for i in range(cols):
+            results[row*cols+i]=rowdata[i]
+        print("a l:"+str(len(stats))+" r:"+str(resultsrows))
+        if len(stats) == resultsrows:
+            break
 
 
 if rank == 0:
@@ -66,7 +60,7 @@ if rank == 0:
 
 
     for i in range(size-1):
-        thread = threading.Thread(target=receive, args=(comm,i+1,stats,results,))
+        thread = threading.Thread(target=receive, args=(comm,i+1,stats,c,p,n,))
         thread.name="rank-"+str(i+1)+"-receiver"
         threads.append(thread)
         thread.start()
@@ -74,6 +68,8 @@ if rank == 0:
 
     t0 = ut.current_milli_time()
     filenameb = path+str(t0)+'-b.json'
+    filenamec = path+str(t0)+'-c.json'
+    filenames = path+str(t0)+'-stats.json'
     
     ut.writeMatrixToFile(b,filenameb)
     messages={}
@@ -94,13 +90,14 @@ if rank == 0:
     
     t0 = ut.current_milli_time()
     comm.bcast(json.dumps(messages),0)
-    print(json.dumps(messages))
+    #print(json.dumps(messages))
     for thread in threads:
         thread.join()
     out['t']=ut.current_milli_time()-t0
-    #c = ut.mergeResults(n,m,p,results)
     out['stats']=stats
-    print(out)
+    out['results']=results
+    ut.writeMatrixToFile(c,filenamec)
+    ut.writeStatsToFile(out,filenames)
 
 else: # if rank is different then 0 this is a calculator node
     port = None

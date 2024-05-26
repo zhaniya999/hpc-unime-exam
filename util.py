@@ -10,6 +10,9 @@ def readMatrixFromFile(filename):
 def writeMatrixToFile(matrix,filename):
     json.dump(matrix.tolist(), codecs.open(filename, 'w', encoding='utf-8'), separators=(',', ':'), sort_keys=False, indent=0)
 
+def writeStatsToFile(stats,filename):
+    json.dump(stats, codecs.open(filename, 'w', encoding='utf-8'), separators=(',', ':'), sort_keys=False, indent=4)
+
 def current_milli_time():
     return round(time.time() * 1000)
 
@@ -27,4 +30,4 @@ def initRandomMatrix(name,n,m,max,debug):
 def initZeroMatrix(name,n,m,debug):
     if debug:
         log("Init %s: %sx%s with zeros",name,n,m)
-    return np.zeros((n*m), dtype=np.float64)
+    return np.zeros((n*m), dtype=np.int32)
