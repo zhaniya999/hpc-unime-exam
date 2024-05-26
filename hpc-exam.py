@@ -24,7 +24,9 @@ def receive(comm,i,stats,results):
     while size-1 > len(stats):
         data = json.loads(comm.recv(source=i))
         stats.append(data)
-        results[data['row']] = data["result"]
+        #print(data["result"])
+        
+        #results[data['row']] = data["result"]
         #print("n:"+str(n)+" len(stats):"+str(len(stats)))
         #res = json.loads(comm.recv(source=i))
         #stat = {"rank":i,            "row":res["row"],                    "time":res["time"],"type":res["type"]}
@@ -49,24 +51,25 @@ if rank == 0:
     global results
     global stats
     
-    n = int(input("n:"))
-    m = int(input("m:"))
-    p = int(input("p:"))
+    n = int(input("A rows:"))
+    m = int(input("A columns/B rows:"))
+    p = int(input("B columns:"))
+    max = int(input("Maximum:"))
 
-    results = [""]*n
+    results = []
     stats = []
     debug = True
+
+    a = ut.initRandomMatrix('A',n,m,max,debug)
+    b = ut.initRandomMatrix('B',m,p,max,debug)
+    c = ut.initZeroMatrix('C',n,p,debug)
+
 
     for i in range(size-1):
         thread = threading.Thread(target=receive, args=(comm,i+1,stats,results,))
         thread.name="rank-"+str(i+1)+"-receiver"
         threads.append(thread)
         thread.start()
-
-    a = ut.initRandomMatrix('A',n,m,debug)
-    a = a.astype(np.float64)
-    b = ut.initRandomMatrix('B',m,p,debug)
-    b = b.astype(np.float64)
     
 
     t0 = ut.current_milli_time()
@@ -91,6 +94,7 @@ if rank == 0:
     
     t0 = ut.current_milli_time()
     comm.bcast(json.dumps(messages),0)
+    print(json.dumps(messages))
     for thread in threads:
         thread.join()
     out['t']=ut.current_milli_time()-t0
@@ -124,22 +128,16 @@ else: # if rank is different then 0 this is a calculator node
         out.setRank(rank)
     
 
-        #the first matrix is always a row vector of size 1xn
-        #the second matrix have n rows, so the columns are calulate dividing the readed array lenght by the rows
+        #the first matrix is always a row vector of size m columns
+        #the second matrix have m rows, so the columns are calulate dividing the readed array lenght by the rows
         #the results is a row vector with the same number of columns of b matrix
         
         n = 1
         m = int(len(a))
         p = int(len(b)/m)
-
-        c = np.zeros(p, dtype=np.float64)
-
-        a = a.astype(np.float64)
-        b = b.astype(np.float64)
-
-        print(a)
-        print(b)
         
+        c = np.zeros(p, dtype=np.int32)
+
         platforms = cl.get_platforms()
         dev = platforms[0].get_devices(device_type=cl.device_type.GPU)
         if(len(dev)==0):
@@ -154,30 +152,32 @@ else: # if rank is different then 0 this is a calculator node
         ctx = cl.Context(devices=dev)
         queue = cl.CommandQueue(ctx)
 
-        matrix_buf = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=b)
         vector_buf = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=a)
+        matrix_buf = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=b)
         result_buf = cl.Buffer(ctx, cl.mem_flags.WRITE_ONLY, c.nbytes)
 
         prg = cl.Program(ctx, """
-            __kernel void multiply(__global float* matrix,
-                __global float* vector,
-                __global float* result,
+        __kernel void multiply(__global const int* matrix,
+                __global const int* vector,
+                __global int* result,
                 const int rows,
                 const int cols) {
-                        int row = get_global_id(0);
-                        if (row < rows) {
-                            float sum = 0.0f;
-                            for (int col = 0; col < cols; col++) {
-                                printf("m[%d]=%f v[%d]=%f m*v=%f - ",row * cols + col,matrix[row * cols + col],col,vector[col],matrix[row * cols + col] * vector[col]);
-                                sum += matrix[row * cols + col] * vector[col];
-                            }
-                        result[row] = sum;
-                        printf("#");
+            int row = get_global_id(0);
+            //printf("cols:%d rows:%d ",cols,rows);
+            //printf("\\n");
+            if (row < rows) {
+                int sum = 0;
+                for (int col = 0; col < cols; col++) { // related to vector column
+                    //printf("v[%d]:%d m[%d]:%d m*v:%d\\n",col,vector[col],col * rows + row,matrix[col * rows + row],matrix[col * rows + row] * vector[col]);
+                    sum += matrix[col * rows + row] * vector[col];
                     }
+                result[row] = sum;
                 }
-            """).build()
+            //printf("\\n");
+            }
+        """).build()
         kernel = prg.multiply
-        kernel.set_args(matrix_buf, vector_buf, result_buf, np.int32(m), np.int32(p))
+        kernel.set_args(matrix_buf, vector_buf, result_buf, np.int32(p), np.int32(m))
         t0 = ut.current_milli_time()
         cl.enqueue_nd_range_kernel(queue, kernel, (m,), None)
         cl.enqueue_copy(queue, c, result_buf)
