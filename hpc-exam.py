@@ -16,19 +16,22 @@ service = 'hpc'
 debug = False
 path = '/nfs/'
 
-def receive(comm,i,stats,results,cols,resultsrows):
-    print("b l:"+str(len(stats))+" r:"+str(resultsrows))
-    #while len(stats) < resultsrows:
-    while True:
-        data = json.loads(comm.recv(source=i))
-        stats.append(data)
-        rowdata = ut.readMatrixFromFile(data["result"])
-        row = int(data["row"])
-        for i in range(cols):
-            results[row*cols+i]=rowdata[i]
-        print("a l:"+str(len(stats))+" r:"+str(resultsrows))
-        if len(stats) == resultsrows:
+def receive(comm,pn,stats,results,cols,resultsrows):
+    data = None
+    while data != "stop":
+        try:
+            data = json.loads(comm.recv(source=pn))
+            stats.append(data)
+            rowdata = ut.readMatrixFromFile(data["result"])
+            row = int(data["row"])
+            for j in range(cols):
+                results[row*cols+j]=rowdata[j]
+            #print("l:"+str(len(stats))+" r:"+str(resultsrows))
+        except:
+            print(f"errore in {pn}")
             break
+            #print("l:"+str(len(stats))+" r:"+str(resultsrows))
+            #print(stats)
 
 
 if rank == 0:
@@ -64,6 +67,7 @@ if rank == 0:
         thread.name="rank-"+str(i+1)+"-receiver"
         threads.append(thread)
         thread.start()
+        #print("avviato "+thread.name)
     
 
     t0 = ut.current_milli_time()
@@ -81,8 +85,8 @@ if rank == 0:
 
 
     for i in range(n):
-        destproc = 1 + i % (size-1) # the value 0 is used for the master procecc
-        filename = path+str(t0)+'-a-'+str(destproc)+'-'+str(i)+'.json'
+        destproc = 1 + i % (size-1) # the value 0 is used for the master process
+        filename = path+str(t0)+'-a-r'+str(i).zfill(5)+'-p'+str(destproc).zfill(2)+'.json'
         r = a.reshape(n, m)[i]
         ut.writeMatrixToFile(r,filename)
         messages[destproc]["a"].append(filename)
@@ -118,8 +122,8 @@ else: # if rank is different then 0 this is a calculator node
         a = ut.readMatrixFromFile(patha)
 
         pathtok=patha.split("-")
-        row = pathtok[len(pathtok)-1].split(".")[0]
-        filename = pathtok[0]+"-c-"+str(rank)+"-"+pathtok[len(pathtok)-1]
+        row = pathtok[2][1:]
+        filename = pathtok[0]+"-c-r"+str(row)+'-p'+str(rank).zfill(2)+'.json'
         out.setRow(row)
         out.setResult(filename)
         out.setRank(rank)
@@ -183,3 +187,6 @@ else: # if rank is different then 0 this is a calculator node
         ut.writeMatrixToFile(c,filename)
 
         comm.send(out.toJSON(), dest=0)
+    comm.send("stop",dest=0)
+
+MPI.Finalize()
