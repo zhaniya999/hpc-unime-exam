@@ -28,7 +28,7 @@ def receive(comm,pn,stats,results,cols,resultsrows):
                 results[row*cols+j]=rowdata[j]
             #print("l:"+str(len(stats))+" r:"+str(resultsrows))
         except:
-            print(f"errore in {pn}")
+#            print(f"errore in {pn}")
             break
             #print("l:"+str(len(stats))+" r:"+str(resultsrows))
             #print(stats)
@@ -48,10 +48,11 @@ if rank == 0:
     global results
     global stats
     
-    n = int(input("A rows:"))
-    m = int(input("A columns/B rows:"))
-    p = int(input("B columns:"))
-    max = int(input("Maximum:"))
+    #n = int(input("A rows:"))
+    #m = int(input("A columns/B rows:"))
+    #p = int(input("B columns:"))
+    #max = int(input("Maximum:"))
+    n,m,p,max=100,100,100,10
 
     results = []
     stats = []
@@ -71,6 +72,7 @@ if rank == 0:
     
 
     t0 = ut.current_milli_time()
+    outcsv = str(t0)+","+str(size)+","+str(n)+","+str(m)+","+str(p)
     filenameb = path+str(t0)+'-b.json'
     filenamec = path+str(t0)+'-c.json'
     filenames = path+str(t0)+'-stats.json'
@@ -102,6 +104,11 @@ if rank == 0:
     out['results']=results
     ut.writeMatrixToFile(c,filenamec)
     ut.writeStatsToFile(out,filenames)
+    outcsv=outcsv+","+str(out['t'])+"\n"
+    with open(path+"stats.csv", "a") as myfile:
+        myfile.write(outcsv)
+        myfile.close()
+        
 
 else: # if rank is different then 0 this is a calculator node
     port = None
